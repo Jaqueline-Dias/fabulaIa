@@ -1,98 +1,161 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { gerarHistoria } from "../../Service/ai/generator";
+import styles from "../../styles/index";
+import * as Clipboard from "expo-clipboard";
+import { MotiView } from "moti";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+// Opções para tempo de leitura e valores/aprendizados
+const TEMPOS_LEITURA = ["2 min", "5 min", "10 min"];
+const VALORES = ["Compartilhar", "Coragem", "Amizade", "Honestidade"];
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+export default function Index() {
+  // Entradas do usuário
+  const [tema, setTema] = useState("");
+  const [tempoLeitura, setTempoLeitura] = useState(TEMPOS_LEITURA[0]);
+  const [valor, setValor] = useState(VALORES[0]);
+
+  // Estado da resposta da IA
+  const [historia, setHistoria] = useState("");
+  const [carregando, setCarregando] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+
+  // Chama a IA com os campos e mostra o resultado
+  const gerar = async () => {
+    if (!tema.trim()) return;
+
+    setCarregando(true);
+    setHistoria("");
+    setCopiado(false);
+
+    try {
+      const resultado = await gerarHistoria({
+        tema,
+        valor,
+        tempoLeitura,
+      });
+      setHistoria(resultado);
+    } catch (error) {
+      console.error("Erro ao gerar história:", error);
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  // Copia a história para a área de transferência
+  const copiar = async () => {
+    try {
+      await Clipboard.setStringAsync(historia);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch (error) {
+      console.error("Erro ao copiar:", error);
+    }
+  };
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.conteudo}
+    >
+      <Text style={styles.titulo}>FabulaIA</Text>
+      <Text style={styles.subtitulo}>
+        Crie histórias infantis personalizadas com valores positivos
+      </Text>
+
+      <Text style={styles.label}>Tema da história</Text>
+      <TextInput
+        value={tema}
+        onChangeText={setTema}
+        placeholder="Ex.: Um astronauta no espaço, Uma floresta mágica"
+        placeholderTextColor="#5A5872"
+        style={styles.input}
+        multiline
+      />
+
+      <Text style={styles.label}>Tempo de leitura</Text>
+      <View style={styles.chipsLinha}>
+        {TEMPOS_LEITURA.map((opcao) => (
+          <TouchableOpacity
+            key={opcao}
+            style={[styles.chip, tempoLeitura === opcao && styles.chipAtivo]}
+            onPress={() => setTempoLeitura(opcao)}
+          >
+            <Text
+              style={[
+                styles.chipTexto,
+                tempoLeitura === opcao && styles.chipTextoAtivo,
+              ]}
+            >
+              {opcao}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Text style={styles.label}>Valor / Aprendizado</Text>
+      <View style={styles.chipsLinha}>
+        {VALORES.map((opcao) => (
+          <TouchableOpacity
+            key={opcao}
+            style={[styles.chip, valor === opcao && styles.chipAtivo]}
+            onPress={() => setValor(opcao)}
+          >
+            <Text
+              style={[
+                styles.chipTexto,
+                valor === opcao && styles.chipTextoAtivo,
+              ]}
+            >
+              {opcao}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <TouchableOpacity
+        style={[styles.botao, carregando && styles.botaoDesativado]}
+        onPress={gerar}
+        disabled={carregando}
+      >
+        {carregando ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <Text style={styles.botaoTexto}>Gerar história</Text>
+        )}
+      </TouchableOpacity>
+
+      {/* Exibição da história gerada */}
+      {historia !== "" && (
+        <MotiView
+          from={{ opacity: 0, translateY: 20 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ type: "timing", duration: 400 }}
+          style={styles.card}
+        >
+          <Text style={styles.cardTitulo}>Era uma vez...</Text>
+          <Text style={styles.cardTexto}>{historia}</Text>
+
+          <View style={styles.acoes}>
+            <TouchableOpacity style={styles.botaoSecundario} onPress={copiar}>
+              <Text style={styles.botaoSecundarioTexto}>
+                {copiado ? "Copiado!" : "Copiar história"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.botaoSecundario} onPress={gerar}>
+              <Text style={styles.botaoSecundarioTexto}>Criar outra</Text>
+            </TouchableOpacity>
+          </View>
+        </MotiView>
+      )}
+    </ScrollView>
   );
 }
-
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
-});
